@@ -1,0 +1,31 @@
+PLEASE READ BEFORE YOU SET UP LIGHTROOM SYNC
+
+1. USE THE SAME PATHS ON EVERY COMPUTER.
+   Lightroom remembers where each photo is. Your photos must be reachable at exactly the same path on all your computers: the same drive letter (for example P:\Photos) or the same network path (for example \\nas\photos). Map the network drive to the same letter on every PC. If the paths differ, Lightroom will show your photos as missing after a sync. Only the catalog folder itself may differ between computers.
+
+2. ONE COMPUTER AT A TIME.
+   Never open Lightroom on two computers at once. Close Lightroom, wait until the app says "Up to date" (or shows "Catalogs uploaded"), and only then move to the other computer.
+
+3. USE THE SAME LIGHTROOM CLASSIC VERSION EVERYWHERE.
+   A newer Lightroom upgrades the catalog, and an older Lightroom cannot open an upgraded catalog.
+
+4. ONLY CATALOGS ARE SYNCED.
+   Photos, previews, presets and Lightroom settings are not copied. Keep your photos on storage every computer can reach.
+
+5. USE A FOLDER JUST FOR LIGHTROOM SYNC.
+   The network folder must be readable and writable from every computer. Do not use it for other things (for example another program's photo library).
+
+6. DO NOT WORK WITHOUT THE NETWORK FOLDER.
+   If the network folder cannot be reached, the app pauses. Do not open Lightroom in that state: the computer cannot check for a newer catalog, and you could create two different versions of your catalog.
+
+7. BACK UP THE NETWORK FOLDER.
+   The zips there are your shared copy. The app never deletes them, but a failed disk would. Old zips can be deleted by hand; keep the newest one of each catalog.
+
+8. THE X BUTTON QUITS THE APP.
+   To keep syncing in the background, use File > Minimize To Tray, and turn on File > Launch At Startup.
+
+9. REQUIREMENTS.
+   Windows 10 or 11 (64-bit) and Lightroom Classic. Lightroom (cloud) is not supported.
+
+FIRST TIME
+   On the first computer, close Lightroom and click "Upload now". On every other computer, close Lightroom and click "Sync now". The full guide is in Help > User Guide (F1).

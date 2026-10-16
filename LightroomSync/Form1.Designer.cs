@@ -60,6 +60,7 @@
             helpToolStripMenuItem = new ToolStripMenuItem();
             userGuideToolStripMenuItem = new ToolStripMenuItem();
             openLogFolderToolStripMenuItem = new ToolStripMenuItem();
+            importantNotesToolStripMenuItem = new ToolStripMenuItem();
             submitABugToolStripMenuItem = new ToolStripMenuItem();
             gitHubPageToolStripMenuItem = new ToolStripMenuItem();
             checkForUpdatesToolStripMenuItem = new ToolStripMenuItem();
@@ -347,7 +348,7 @@
             //
             // helpToolStripMenuItem
             //
-            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { userGuideToolStripMenuItem, submitABugToolStripMenuItem, gitHubPageToolStripMenuItem, checkForUpdatesToolStripMenuItem, openLogFolderToolStripMenuItem, aboutToolStripMenuItem });
+            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { userGuideToolStripMenuItem, importantNotesToolStripMenuItem, submitABugToolStripMenuItem, gitHubPageToolStripMenuItem, checkForUpdatesToolStripMenuItem, openLogFolderToolStripMenuItem, aboutToolStripMenuItem });
             helpToolStripMenuItem.Name = "helpToolStripMenuItem";
             helpToolStripMenuItem.Text = "Help";
             //
@@ -357,6 +358,12 @@
             userGuideToolStripMenuItem.ShortcutKeys = Keys.F1;
             userGuideToolStripMenuItem.Text = "User Guide";
             userGuideToolStripMenuItem.Click += userGuideToolStripMenuItem_Click;
+            //
+            // importantNotesToolStripMenuItem
+            //
+            importantNotesToolStripMenuItem.Name = "importantNotesToolStripMenuItem";
+            importantNotesToolStripMenuItem.Text = "Important Notes";
+            importantNotesToolStripMenuItem.Click += importantNotesToolStripMenuItem_Click;
             //
             // openLogFolderToolStripMenuItem
             //
@@ -434,6 +441,7 @@
         private Button buttonCatalogs;
         private Button buttonOpenLightroom;
         private ToolStripMenuItem openLogFolderToolStripMenuItem;
+        private ToolStripMenuItem importantNotesToolStripMenuItem;
         private ProgressBar progressBar;
         private ToolStripMenuItem settingsToolStripMenuItem;
         private ToolStripMenuItem userGuideToolStripMenuItem;

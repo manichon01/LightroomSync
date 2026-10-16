@@ -27,6 +27,7 @@ namespace LightroomSync
 
         private bool timerBeingHandled = false; //Used to handle async events in the timer potentially firing multiple times
         private bool networkWasDown = false;
+        private bool sharedFolderWarned = false;
         private readonly HashSet<string> failedCatalogs = new(); // zips that failed to sync; not retried until "Sync now"
 
         private List<string> lastKnownNetworkVersions = new(); // cached so the Catalogs dialog never touches the share
@@ -772,8 +773,26 @@ namespace LightroomSync
             return error;
         }
 
+        private void ShowImportantNotes()
+        {
+            using var dialog = new NotesForm(Font, Icon);
+            dialog.ShowDialog(this);
+        }
+
+        private void importantNotesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            ShowImportantNotes();
+        }
+
         private void Form1_Load(object sender, EventArgs e)
         {
+            // No settings file yet: this is the first run on this computer.
+            bool firstRun = !File.Exists("config.txt");
+            if (firstRun)
+            {
+                BeginInvoke(ShowImportantNotes);
+            }
+
             if (File.Exists("config.txt"))
             {
 
@@ -930,6 +949,12 @@ namespace LightroomSync
                     networkWasDown = false;
                     Log("Network folder is back. Resuming sync.");
                     Notify("Network folder is back", "Sync resumed.");
+                }
+
+                if (!sharedFolderWarned && File.Exists(Path.Combine(config.NetworkFolder, "catalog.snap")))
+                {
+                    sharedFolderWarned = true;
+                    Log("NOTE: the network folder also holds a LightCraft library (catalog.snap). Lightroom Sync only touches its own zips and status.txt, but a folder just for Lightroom Sync avoids confusion.");
                 }
 
                 await HandleTimerEventCore();

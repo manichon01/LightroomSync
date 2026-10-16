@@ -1,4 +1,4 @@
-; Build the app first (from the repo root):
+﻿; Build the app first (from the repo root):
 ;   dotnet publish LightroomSync/LightroomSync.csproj -c Release -r win-x64 --self-contained -o publish
 ; then compile this script (ISCC InnoSetup.iss). The installer lands in the "installer" folder.
 
@@ -21,6 +21,8 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE
+; Shown on a wizard page before the install starts. The app shows the same text on first run.
+InfoBeforeFile=LightroomSync\ImportantNotes.txt
 SetupIconFile=LightroomSync\camera.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ; Per-user install by default (no admin prompt); the user can still choose all users in the dialog.

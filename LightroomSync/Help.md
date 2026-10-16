@@ -10,6 +10,8 @@ Lightroom Classic catalogs are meant for one computer. Lightroom will not run a 
 
 > Lightroom Sync syncs **catalogs only**. It does not copy your photos, previews or Lightroom presets and settings. See "What is and is not synced".
 
+> The most important setup warnings are also in **Help > Important Notes**. They appear automatically the first time you run the app and on a page of the installer.
+
 ## What you need
 
 - Two or more Windows 10 or 11 (64-bit) computers with **Lightroom Classic**.
