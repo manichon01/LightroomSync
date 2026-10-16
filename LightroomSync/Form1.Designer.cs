@@ -57,6 +57,7 @@
             exitToolStripMenuItem = new ToolStripMenuItem();
             settingsToolStripMenuItem = new ToolStripMenuItem();
             helpToolStripMenuItem = new ToolStripMenuItem();
+            userGuideToolStripMenuItem = new ToolStripMenuItem();
             submitABugToolStripMenuItem = new ToolStripMenuItem();
             gitHubPageToolStripMenuItem = new ToolStripMenuItem();
             checkForUpdatesToolStripMenuItem = new ToolStripMenuItem();
@@ -332,9 +333,16 @@
             //
             // helpToolStripMenuItem
             //
-            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { submitABugToolStripMenuItem, gitHubPageToolStripMenuItem, checkForUpdatesToolStripMenuItem, aboutToolStripMenuItem });
+            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { userGuideToolStripMenuItem, submitABugToolStripMenuItem, gitHubPageToolStripMenuItem, checkForUpdatesToolStripMenuItem, aboutToolStripMenuItem });
             helpToolStripMenuItem.Name = "helpToolStripMenuItem";
             helpToolStripMenuItem.Text = "Help";
+            //
+            // userGuideToolStripMenuItem
+            //
+            userGuideToolStripMenuItem.Name = "userGuideToolStripMenuItem";
+            userGuideToolStripMenuItem.ShortcutKeys = Keys.F1;
+            userGuideToolStripMenuItem.Text = "User Guide";
+            userGuideToolStripMenuItem.Click += userGuideToolStripMenuItem_Click;
             //
             // submitABugToolStripMenuItem
             //
@@ -406,6 +414,7 @@
         private Button buttonCatalogs;
         private ProgressBar progressBar;
         private ToolStripMenuItem settingsToolStripMenuItem;
+        private ToolStripMenuItem userGuideToolStripMenuItem;
         private Label labelEvents;
         private TextBox eventsTextBox;
         private System.Windows.Forms.Timer timer1;

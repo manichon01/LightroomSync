@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="camera.ico" />
+    <EmbeddedResource Include="Help.md" />
     <EmbeddedResource Include="checkmark.png" />
   </ItemGroup>
 

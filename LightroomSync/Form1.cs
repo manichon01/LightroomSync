@@ -374,8 +374,13 @@ namespace LightroomSync
             }
 
             //Verify status file says it's safe to work (if it exists, otherwise, we can assume this is the first time)
+            bool firstUpload = !File.Exists(Path.Combine(config.NetworkFolder, "status.txt"));
             Status? loadedStatus = getNetworkStatus();
-            if (loadedStatus != null && loadedStatus.isSafeToOverride)
+            if (firstUpload)
+            {
+                //No status file yet: nothing has been uploaded to this folder, so there is nothing to overwrite.
+            }
+            else if (loadedStatus != null && loadedStatus.isSafeToOverride)
             {
                 //Safe to proceed
             }
@@ -567,6 +572,21 @@ namespace LightroomSync
         {
             using var dialog = new CatalogsForm(this);
             dialog.ShowDialog(this);
+        }
+
+        private HelpForm? helpForm;
+
+        private void userGuideToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (helpForm == null || helpForm.IsDisposed)
+            {
+                helpForm = new HelpForm(Font, Icon);
+                helpForm.Show(this);
+            }
+            else
+            {
+                helpForm.Activate();
+            }
         }
 
         private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
