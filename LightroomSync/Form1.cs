@@ -16,7 +16,7 @@ namespace LightroomSync
 {
     public partial class Form1 : Form
     {
-        private const string RepoUrl = "https://github.com/software-2/LightroomSync"; // point at your fork once you publish one
+        private const string RepoUrl = "https://github.com/manichon01/LightroomSync";
         public string currentVersion = "1.1.0"; // <----- Make sure you always update latestVersion.txt as well!
                                                 // Yes, I'm too lazy to pipe this in.
 

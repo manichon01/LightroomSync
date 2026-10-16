@@ -5,7 +5,7 @@
 #define MyAppName "LightroomSync"
 #define MyAppVersion "1.1.0"
 #define MyAppPublisher "Anthony Bryan"
-#define MyAppURL "https://github.com/software-2/LightroomSync"
+#define MyAppURL "https://github.com/manichon01/LightroomSync"
 #define MyAppExeName "LightroomSync.exe"
 
 [Setup]
