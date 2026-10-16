@@ -11,6 +11,7 @@ namespace LightroomSync
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
+            Application.SetColorMode(SystemColorMode.System); // follow the Windows light/dark setting
 
             if (!Directory.Exists(Utils.GetWorkingDir()))
             {

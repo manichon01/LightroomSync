@@ -1,5 +1,4 @@
-﻿using IWshRuntimeLibrary;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,8 +15,9 @@ namespace LightroomSync
             string startupFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
             string shortcutPath = Path.Combine(startupFolderPath, "LightroomSync.lnk");
 
-            WshShell shell = new WshShell();
-            IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+            // Late-bound COM so the project builds with plain `dotnet build`.
+            dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+            dynamic shortcut = shell.CreateShortcut(shortcutPath);
             shortcut.TargetPath = appPath;
             shortcut.WorkingDirectory = Path.GetDirectoryName(appPath);
             shortcut.Description = "LightroomSync";
