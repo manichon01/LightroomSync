@@ -35,6 +35,7 @@
             statusDotLabel = new Label();
             statusLabel = new Label();
             statusDetailLabel = new Label();
+            progressBar = new ProgressBar();
             labelLocal = new Label();
             localFolderTextBox = new TextBox();
             buttonSelectLocalFolder = new Button();
@@ -44,6 +45,7 @@
             actionsPanel = new FlowLayoutPanel();
             buttonSyncNow = new Button();
             buttonUploadNow = new Button();
+            buttonCatalogs = new Button();
             labelEvents = new Label();
             eventsTextBox = new TextBox();
             timer1 = new System.Windows.Forms.Timer(components);
@@ -53,6 +55,7 @@
             autoCheckForUpdatesToolStripMenuItem = new ToolStripMenuItem();
             minimizeToTrayToolStripMenuItem = new ToolStripMenuItem();
             exitToolStripMenuItem = new ToolStripMenuItem();
+            settingsToolStripMenuItem = new ToolStripMenuItem();
             helpToolStripMenuItem = new ToolStripMenuItem();
             submitABugToolStripMenuItem = new ToolStripMenuItem();
             gitHubPageToolStripMenuItem = new ToolStripMenuItem();
@@ -107,11 +110,13 @@
             headerPanel.Controls.Add(statusDotLabel, 0, 0);
             headerPanel.Controls.Add(statusLabel, 1, 0);
             headerPanel.Controls.Add(statusDetailLabel, 1, 1);
+            headerPanel.Controls.Add(progressBar, 1, 2);
             headerPanel.SetRowSpan(statusDotLabel, 2);
             headerPanel.Dock = DockStyle.Top;
             headerPanel.Margin = new Padding(0, 0, 0, 16);
             headerPanel.Name = "headerPanel";
-            headerPanel.RowCount = 2;
+            headerPanel.RowCount = 3;
+            headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             headerPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             //
@@ -140,6 +145,16 @@
             statusDetailLabel.Margin = new Padding(0);
             statusDetailLabel.Name = "statusDetailLabel";
             statusDetailLabel.Text = " ";
+            //
+            // progressBar: hidden unless a transfer is running; marquee when the duration is unknown
+            //
+            progressBar.Dock = DockStyle.Fill;
+            progressBar.Margin = new Padding(0, 8, 0, 0);
+            progressBar.Maximum = 1000;
+            progressBar.MarqueeAnimationSpeed = 30;
+            progressBar.Name = "progressBar";
+            progressBar.Size = new Size(100, 8);
+            progressBar.Visible = false;
             //
             // labelLocal
             //
@@ -205,6 +220,7 @@
             actionsPanel.AutoSize = true;
             actionsPanel.Controls.Add(buttonSyncNow);
             actionsPanel.Controls.Add(buttonUploadNow);
+            actionsPanel.Controls.Add(buttonCatalogs);
             actionsPanel.Dock = DockStyle.Top;
             actionsPanel.Margin = new Padding(0, 0, 0, 12);
             actionsPanel.Name = "actionsPanel";
@@ -233,6 +249,17 @@
             buttonUploadNow.UseVisualStyleBackColor = true;
             buttonUploadNow.Click += buttonUploadNow_Click;
             //
+            // buttonCatalogs
+            //
+            buttonCatalogs.AutoSize = false;
+            buttonCatalogs.Margin = new Padding(8, 0, 0, 0);
+            buttonCatalogs.Name = "buttonCatalogs";
+            buttonCatalogs.Size = new Size(130, 36);
+            buttonCatalogs.TabIndex = 7;
+            buttonCatalogs.Text = "Catalogs...";
+            buttonCatalogs.UseVisualStyleBackColor = true;
+            buttonCatalogs.Click += buttonCatalogs_Click;
+            //
             // labelEvents
             //
             labelEvents.AutoSize = true;
@@ -250,7 +277,7 @@
             eventsTextBox.Name = "eventsTextBox";
             eventsTextBox.ReadOnly = true;
             eventsTextBox.ScrollBars = ScrollBars.Vertical;
-            eventsTextBox.TabIndex = 7;
+            eventsTextBox.TabIndex = 8;
             //
             // timer1
             //
@@ -269,7 +296,7 @@
             //
             // fileToolStripMenuItem
             //
-            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { launchAtStartupToolStripMenuItem, autoCheckForUpdatesToolStripMenuItem, minimizeToTrayToolStripMenuItem, exitToolStripMenuItem });
+            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { launchAtStartupToolStripMenuItem, autoCheckForUpdatesToolStripMenuItem, minimizeToTrayToolStripMenuItem, settingsToolStripMenuItem, exitToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Text = "File";
             //
@@ -290,6 +317,12 @@
             minimizeToTrayToolStripMenuItem.Name = "minimizeToTrayToolStripMenuItem";
             minimizeToTrayToolStripMenuItem.Text = "Minimize To Tray";
             minimizeToTrayToolStripMenuItem.Click += minimizeToTrayToolStripMenuItem_Click;
+            //
+            // settingsToolStripMenuItem
+            //
+            settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
+            settingsToolStripMenuItem.Text = "Settings...";
+            settingsToolStripMenuItem.Click += settingsToolStripMenuItem_Click;
             //
             // exitToolStripMenuItem
             //
@@ -370,6 +403,9 @@
         private FlowLayoutPanel actionsPanel;
         private Button buttonSyncNow;
         private Button buttonUploadNow;
+        private Button buttonCatalogs;
+        private ProgressBar progressBar;
+        private ToolStripMenuItem settingsToolStripMenuItem;
         private Label labelEvents;
         private TextBox eventsTextBox;
         private System.Windows.Forms.Timer timer1;

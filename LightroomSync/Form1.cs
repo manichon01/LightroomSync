@@ -16,7 +16,8 @@ namespace LightroomSync
 {
     public partial class Form1 : Form
     {
-        public string currentVersion = "1.0.0"; // <----- Make sure you always update latestVersion.txt as well!
+        private const string RepoUrl = "https://github.com/software-2/LightroomSync"; // point at your fork once you publish one
+        public string currentVersion = "1.1.0"; // <----- Make sure you always update latestVersion.txt as well!
                                                 // Yes, I'm too lazy to pipe this in.
 
         private Config config = new Config();
@@ -27,6 +28,8 @@ namespace LightroomSync
         private bool timerBeingHandled = false; //Used to handle async events in the timer potentially firing multiple times
         private bool networkWasDown = false;
         private readonly HashSet<string> failedCatalogs = new(); // zips that failed to sync; not retried until "Sync now"
+
+        private List<string> lastKnownNetworkVersions = new(); // cached so the Catalogs dialog never touches the share
 
         private NotifyIcon trayIcon;
         private ContextMenuStrip trayMenu;
@@ -98,8 +101,146 @@ namespace LightroomSync
             trayIcon.Text = "LightroomSync - " + headline; // NotifyIcon.Text max is 127 chars
         }
 
+        private void Notify(string title, string text, ToolTipIcon icon = ToolTipIcon.Info)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string, string, ToolTipIcon>(Notify), title, text, icon);
+                return;
+            }
+            if (config.Notifications)
+            {
+                trayIcon.ShowBalloonTip(5000, title, text, icon);
+            }
+        }
+
+        // fraction == null shows a marquee bar for steps without measurable progress (zip, extract).
+        private void SetProgress(double? fraction, string detail)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action<double?, string>(SetProgress), fraction, detail);
+                return;
+            }
+            progressBar.Visible = true;
+            progressBar.Style = fraction == null ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
+            if (fraction != null)
+            {
+                progressBar.Value = (int)Math.Clamp(fraction.Value * 1000, 0, 1000);
+            }
+            statusDetailLabel.Text = detail;
+        }
+
+        private static string FormatSize(long bytes)
+        {
+            string[] units = { "B", "KB", "MB", "GB", "TB" };
+            double size = bytes;
+            int unit = 0;
+            while (size >= 1024 && unit < units.Length - 1)
+            {
+                size /= 1024;
+                unit++;
+            }
+            return size.ToString(unit == 0 ? "0" : "0.0") + " " + units[unit];
+        }
+
+        private Task CopyFileAsync(string source, string destination, string label)
+        {
+            return Task.Run(() =>
+            {
+                using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
+                using var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20);
+                long total = input.Length, done = 0;
+                var buffer = new byte[1 << 20];
+                int read, lastPercent = -1;
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    output.Write(buffer, 0, read);
+                    done += read;
+                    int percent = total > 0 ? (int)(done * 100 / total) : 0;
+                    if (percent != lastPercent)
+                    {
+                        lastPercent = percent;
+                        SetProgress(total > 0 ? done / (double)total : 0, label + ": " + FormatSize(done) + " of " + FormatSize(total));
+                    }
+                }
+            });
+        }
+
+        private static string[] CatalogNames(string catName) =>
+            new[] { catName + ".lrcat", catName + ".lrcat-data", catName + " Helper.lrdata" };
+
+        private string BackupRoot(string catName) => Path.Combine(config.LocalFolder, "LightroomSync Backup", catName);
+
+        private string NewBackupDir(string catName) => Path.Combine(BackupRoot(catName), DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+
+        private string[] BackupDirs(string catName)
+        {
+            string root = BackupRoot(catName);
+            return Directory.Exists(root) ? Directory.GetDirectories(root).OrderBy(d => Path.GetFileName(d)).ToArray() : Array.Empty<string>();
+        }
+
+        // Moves whichever catalog files exist in "from" into "to" (same volume, so these are renames).
+        private static void MoveCatalogFiles(string from, string to, string catName, List<string>? moved)
+        {
+            foreach (string name in CatalogNames(catName))
+            {
+                string source = Path.Combine(from, name);
+                if (File.Exists(source))
+                {
+                    File.Move(source, Path.Combine(to, name));
+                }
+                else if (Directory.Exists(source))
+                {
+                    Directory.Move(source, Path.Combine(to, name));
+                }
+                else
+                {
+                    continue;
+                }
+                moved?.Add(name);
+            }
+        }
+
+        // Undo a half-finished swap: put the files that were parked in "savedDir" back into the local folder.
+        private void PutBack(List<string> moved, string savedDir)
+        {
+            foreach (string name in moved)
+            {
+                string target = Path.Combine(config.LocalFolder, name);
+                string saved = Path.Combine(savedDir, name);
+                try
+                {
+                    if (File.Exists(target)) File.Delete(target);
+                    if (Directory.Exists(target)) Directory.Delete(target, true);
+                    if (File.Exists(saved)) File.Move(saved, target);
+                    else if (Directory.Exists(saved)) Directory.Move(saved, target);
+                }
+                catch (Exception ex)
+                {
+                    Log("Could not restore " + name + ": " + ex.Message + ". Your old catalog is in " + savedDir);
+                }
+            }
+        }
+
+        private void PruneBackups(string catName)
+        {
+            foreach (string old in BackupDirs(catName).Reverse().Skip(Math.Max(1, config.BackupsToKeep)))
+            {
+                try
+                {
+                    Directory.Delete(old, true);
+                }
+                catch (Exception ex)
+                {
+                    Log("Could not delete old backup " + old + ": " + ex.Message);
+                }
+            }
+        }
+
         private void RefreshIdleStatus()
         {
+            progressBar.Visible = false;
             if (networkWasDown)
             {
                 SetStatus("Network folder unavailable", StatusRed, "Sync is paused and resumes automatically when the share is back.");
@@ -155,24 +296,19 @@ namespace LightroomSync
                         }
                     }
 
-                    // Zip folders
+                    // Zip folders (optional ones, like Helper.lrdata, may not exist) including subfolders
                     foreach (string folderPath in foldersToZip)
                     {
-                        if (Directory.Exists(folderPath))
+                        if (!Directory.Exists(folderPath))
                         {
-                            string folderName = Path.GetFileName(folderPath);
-
-                            // Zip files inside the folder
-                            string[] files = Directory.GetFiles(folderPath);
-                            foreach (string filePath in files)
-                            {
-                                string entryName = Path.Combine(folderName, Path.GetFileName(filePath));
-                                zipArchive.CreateEntryFromFile(filePath, entryName);
-                            }
+                            continue;
                         }
-                        else
+
+                        string folderName = Path.GetFileName(folderPath);
+                        foreach (string filePath in Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories))
                         {
-                            throw new DirectoryNotFoundException($"Folder not found: {folderPath}");
+                            string entryName = Path.Combine(folderName, Path.GetRelativePath(folderPath, filePath));
+                            zipArchive.CreateEntryFromFile(filePath, entryName);
                         }
                     }
                 }
@@ -203,7 +339,12 @@ namespace LightroomSync
                 string jsonContent = File.ReadAllText(networkStatusFile);
                 try
                 {
-                    return JsonConvert.DeserializeObject<Status>(jsonContent);
+                    var parsedStatus = JsonConvert.DeserializeObject<Status>(jsonContent);
+                    if (parsedStatus != null)
+                    {
+                        lastKnownNetworkVersions = parsedStatus.MostRecentVersions.ToList();
+                    }
+                    return parsedStatus;
                 }
                 catch (JsonException ex)
                 {
@@ -276,27 +417,36 @@ namespace LightroomSync
                 string customFormat = catName + " - " + lastModified.ToString("yyyy-MM-dd HH-mm") + ".zip";
 
                 Log("Zipping " + catName);
+                SetProgress(null, "Zipping " + catName);
                 try
                 {
+                    // A zip left behind by an earlier failed run would make ZipFile.Open fail forever.
+                    File.Delete(customFormat);
                     await ZipFilesAndFolders(customFormat, filesToZip, foldersToZip);
-                    status.MostRecentVersions.Add(customFormat);
                     Log("Files and folders have been zipped successfully.");
                 }
                 catch (Exception ex)
                 {
                     Log("ERROR: zipping files and folders: " + ex.Message);
+                    Notify("Upload failed", "Could not zip " + catName + ": " + ex.Message, ToolTipIcon.Error);
                     return;
                 }
 
-                Log("Moving " + customFormat + " to " + config.NetworkFolder);
+                // Copy to a .part name and rename, so other machines never see a half-written zip.
+                string finalPath = Path.Combine(config.NetworkFolder, customFormat);
+                string partPath = finalPath + ".part";
                 try
                 {
-                    await Task.Run(() => { File.Move(customFormat, config.NetworkFolder + "\\" + customFormat, true); });
-                    Log(customFormat + " moved successfully.");
+                    await CopyFileAsync(customFormat, partPath, "Uploading " + catName);
+                    await Task.Run(() => { File.Move(partPath, finalPath, true); File.Delete(customFormat); });
+                    status.MostRecentVersions.Add(customFormat);
+                    Log(customFormat + " uploaded successfully.");
                 }
-                catch (IOException ex)
+                catch (Exception ex)
                 {
-                    Log("Error moving: " + ex.Message);
+                    Log("ERROR uploading " + customFormat + ": " + ex.Message);
+                    Notify("Upload failed", "Could not upload " + catName + ": " + ex.Message, ToolTipIcon.Error);
+                    return;
                 }
             }
 
@@ -311,6 +461,7 @@ namespace LightroomSync
                 return;
             }
             Log("Sucessfully updated all " + files.Length.ToString() + " catalog(s) to network share.");
+            Notify("Catalogs uploaded", files.Length + " catalog(s) saved to the network share.");
         }
 
         public Form1(bool startMinimized)
@@ -321,6 +472,7 @@ namespace LightroomSync
             trayIcon = new NotifyIcon();
             trayIcon.Text = "LightroomSync";
             trayIcon.Icon = new Icon(GetType(), "camera.ico");
+            trayIcon.Visible = true; // always shown so notifications can appear
 
             // Create a context menu for the tray icon
             trayMenu = new ContextMenuStrip();
@@ -349,7 +501,6 @@ namespace LightroomSync
             this.Show();
             this.ShowInTaskbar = true;
             this.WindowState = FormWindowState.Normal;
-            trayIcon.Visible = false;
         }
 
         private void OnExit(object sender, EventArgs e)
@@ -380,7 +531,8 @@ namespace LightroomSync
             HandleTimerEvent();
         }
 
-        private async void buttonUploadNow_Click(object sender, EventArgs e)
+        // Runs work with the timer paused so it cannot overlap an automatic sync.
+        private async Task RunExclusive(Func<Task> work)
         {
             if (timerBeingHandled)
             {
@@ -392,8 +544,7 @@ namespace LightroomSync
             timer1.Enabled = false;
             try
             {
-                SetStatus("Uploading catalogs...", StatusBlue);
-                await UploadCatalogs();
+                await work();
             }
             catch (Exception ex)
             {
@@ -405,6 +556,97 @@ namespace LightroomSync
                 timer1.Enabled = true;
                 RefreshIdleStatus();
             }
+        }
+
+        private async void buttonUploadNow_Click(object sender, EventArgs e)
+        {
+            await RunExclusive(UploadCatalogs);
+        }
+
+        private void buttonCatalogs_Click(object sender, EventArgs e)
+        {
+            using var dialog = new CatalogsForm(this);
+            dialog.ShowDialog(this);
+        }
+
+        private void settingsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using var dialog = new SettingsForm(config);
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                timer1.Interval = config.CheckIntervalSeconds * 1000;
+            }
+        }
+
+        internal List<CatalogRow> GetCatalogRows()
+        {
+            var rows = new List<CatalogRow>();
+            if (!Directory.Exists(config.LocalFolder))
+            {
+                return rows;
+            }
+
+            foreach (string file in Directory.GetFiles(config.LocalFolder, "*.lrcat"))
+            {
+                string catName = Path.GetFileNameWithoutExtension(file);
+                // Zip names end in " - yyyy-MM-dd HH-mm.zip"
+                string? network = lastKnownNetworkVersions.FirstOrDefault(v => v.StartsWith(catName + " - "));
+                string[] backups = BackupDirs(catName);
+                rows.Add(new CatalogRow(
+                    catName,
+                    File.GetLastWriteTime(file).ToString("yyyy-MM-dd HH:mm"),
+                    network == null ? "-" : network.Substring(network.Length - 20, 16),
+                    backups.Length == 0 ? "none" : backups.Length + " (newest " + Path.GetFileName(backups[^1]) + ")",
+                    backups.Length > 0));
+            }
+            return rows;
+        }
+
+        // Swaps in the newest backup (keeping the current catalog as a backup) and uploads it so other machines follow.
+        internal async Task<string?> RestoreBackup(string catName)
+        {
+            string? error = "A sync is already running; try again in a moment.";
+            await RunExclusive(async () =>
+            {
+                error = null;
+                if (Status.LightroomIsOpen())
+                {
+                    error = "Close Lightroom first.";
+                    return;
+                }
+                string? latest = BackupDirs(catName).LastOrDefault();
+                if (latest == null)
+                {
+                    error = "There is no backup for this catalog.";
+                    return;
+                }
+
+                string swapDir = NewBackupDir(catName);
+                if (swapDir == latest)
+                {
+                    swapDir += "-restore";
+                }
+                Directory.CreateDirectory(swapDir);
+                var moved = new List<string>();
+                try
+                {
+                    MoveCatalogFiles(config.LocalFolder, swapDir, catName, moved);
+                    MoveCatalogFiles(latest, config.LocalFolder, catName, null);
+                    Directory.Delete(latest, true);
+                }
+                catch (Exception ex)
+                {
+                    PutBack(moved, swapDir);
+                    error = "Restore failed, your catalog was left as it was: " + ex.Message;
+                    return;
+                }
+
+                // Make the restored catalog the newest version so the next sync uploads it instead of overwriting it.
+                File.SetLastWriteTime(Path.Combine(config.LocalFolder, catName + ".lrcat"), DateTime.Now);
+                Log("Restored the previous version of " + catName + ". The version it replaced is kept in " + swapDir);
+                await UploadCatalogs();
+            });
+            return error;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -440,6 +682,7 @@ namespace LightroomSync
             networkFolderTextBox.Text = config.NetworkFolder;
 
             status.LastUser = System.Environment.MachineName;
+            timer1.Interval = Math.Max(1, config.CheckIntervalSeconds) * 1000;
 
             if (Utils.ShortcutExistsInStartupFolder())
             {
@@ -462,6 +705,7 @@ namespace LightroomSync
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            trayIcon.Dispose(); // otherwise a ghost icon stays until hovered
             string filePath = "config.txt";
             File.WriteAllText(filePath, config.ToJson());
         }
@@ -552,6 +796,7 @@ namespace LightroomSync
                     {
                         networkWasDown = true;
                         Log("Network folder unavailable. Sync paused until it comes back.");
+                        Notify("Network folder unavailable", "Sync is paused until the share is back.", ToolTipIcon.Warning);
                     }
                     RefreshIdleStatus();
                     return;
@@ -560,6 +805,7 @@ namespace LightroomSync
                 {
                     networkWasDown = false;
                     Log("Network folder is back. Resuming sync.");
+                    Notify("Network folder is back", "Sync resumed.");
                 }
 
                 await HandleTimerEventCore();
@@ -681,22 +927,22 @@ namespace LightroomSync
         private async Task<bool> SyncCatalogFromNetwork(string catalog)
         {
             bool succeeded = false;
-            SetStatus("Downloading newer catalog...", StatusBlue, catalog);
             string catName = catalog.Substring(0, catalog.Length - 23); //23 is len(" - yyyy-MM-dd HH-mm.zip")
+            SetStatus("Downloading newer catalog...", StatusBlue, catalog);
             string workDir = Utils.GetWorkingDir();
             string zipPath = Path.Combine(workDir, catalog);
             string extractDir = Path.Combine(config.LocalFolder, ".lrsync-tmp-" + catName);
-            string backupDir = Path.Combine(config.LocalFolder, "LightroomSync Backup", catName);
-            string[] names = { catName + ".lrcat", catName + ".lrcat-data", catName + " Helper.lrdata" };
+            string backupDir = NewBackupDir(catName);
             var movedToBackup = new List<string>();
 
             Log("Newer catalog version detected! Copying " + catalog + " to local storage.");
             try
             {
                 Directory.CreateDirectory(workDir);
-                await Task.Run(() => File.Copy(Path.Combine(config.NetworkFolder, catalog), zipPath, true));
+                await CopyFileAsync(Path.Combine(config.NetworkFolder, catalog), zipPath, "Downloading " + catName);
                 Log(catalog + " copied successfully. Extracting.");
 
+                SetProgress(null, "Extracting " + catName);
                 await Task.Run(() =>
                 {
                     if (Directory.Exists(extractDir))
@@ -706,77 +952,41 @@ namespace LightroomSync
                     ZipFile.ExtractToDirectory(zipPath, extractDir);
                 });
 
-                string extractedCat = Path.Combine(extractDir, names[0]);
+                string extractedCat = Path.Combine(extractDir, catName + ".lrcat");
                 if (!File.Exists(extractedCat) || new FileInfo(extractedCat).Length == 0)
                 {
-                    throw new InvalidDataException("Zip does not contain a valid " + names[0]);
+                    throw new InvalidDataException("Zip does not contain a valid " + catName + ".lrcat");
                 }
 
-                // Point of no return: park the old catalog in the backup folder (same volume, so it is a rename).
-                if (Directory.Exists(backupDir))
-                {
-                    Directory.Delete(backupDir, true);
-                }
+                // Point of no return: park the old catalog in the backup folder, then move the new one in.
                 Directory.CreateDirectory(backupDir);
                 try
                 {
-                    foreach (string name in names)
-                    {
-                        string current = Path.Combine(config.LocalFolder, name);
-                        if (File.Exists(current))
-                        {
-                            File.Move(current, Path.Combine(backupDir, name));
-                            movedToBackup.Add(name);
-                        }
-                        else if (Directory.Exists(current))
-                        {
-                            Directory.Move(current, Path.Combine(backupDir, name));
-                            movedToBackup.Add(name);
-                        }
-                    }
+                    MoveCatalogFiles(config.LocalFolder, backupDir, catName, movedToBackup);
+                    MoveCatalogFiles(extractDir, config.LocalFolder, catName, null);
 
-                    foreach (string name in names)
+                    // The zip name is the sync marker: make the local file's time produce exactly that name, or every tick would re-download.
+                    if (DateTime.TryParseExact(catalog.Substring(catName.Length + 3, 16), "yyyy-MM-dd HH-mm",
+                            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime stamp))
                     {
-                        string extracted = Path.Combine(extractDir, name);
-                        string target = Path.Combine(config.LocalFolder, name);
-                        if (File.Exists(extracted))
-                        {
-                            File.Move(extracted, target);
-                        }
-                        else if (Directory.Exists(extracted))
-                        {
-                            Directory.Move(extracted, target);
-                        }
+                        File.SetLastWriteTime(Path.Combine(config.LocalFolder, catName + ".lrcat"), stamp);
                     }
                 }
                 catch
                 {
-                    // Put the old catalog back so the user is never left without one.
-                    foreach (string name in movedToBackup)
-                    {
-                        string target = Path.Combine(config.LocalFolder, name);
-                        string saved = Path.Combine(backupDir, name);
-                        try
-                        {
-                            if (File.Exists(target)) File.Delete(target);
-                            if (Directory.Exists(target)) Directory.Delete(target, true);
-                            if (File.Exists(saved)) File.Move(saved, target);
-                            else if (Directory.Exists(saved)) Directory.Move(saved, target);
-                        }
-                        catch (Exception restoreEx)
-                        {
-                            Log("Could not restore " + name + ": " + restoreEx.Message + ". Your old catalog is in " + backupDir);
-                        }
-                    }
+                    PutBack(movedToBackup, backupDir); // never leave the user without a catalog
                     throw;
                 }
 
+                PruneBackups(catName);
                 Log("Catalog " + catName + " is up to date. Previous local version kept in " + backupDir);
+                Notify("Catalog updated", catName + " was updated from the network share.");
                 succeeded = true;
             }
             catch (Exception ex)
             {
                 Log("ERROR syncing " + catName + ": " + ex.Message + ". Your local catalog was not replaced. The zip on the network share is intact.");
+                Notify("Sync failed", "Could not update " + catName + ". Your local catalog was not changed.", ToolTipIcon.Error);
             }
             finally
             {
@@ -784,6 +994,7 @@ namespace LightroomSync
                 {
                     if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
                     if (File.Exists(zipPath)) File.Delete(zipPath);
+                    if (Directory.Exists(backupDir) && !Directory.EnumerateFileSystemEntries(backupDir).Any()) Directory.Delete(backupDir);
                 }
                 catch (Exception ex)
                 {
@@ -801,7 +1012,7 @@ namespace LightroomSync
             {
                 try
                 {
-                    version = await client.GetStringAsync("https://github.com/software-2/LightroomSync/raw/master/latestVersion.txt");
+                    version = await client.GetStringAsync(RepoUrl + "/raw/master/latestVersion.txt");
                 }
                 catch (Exception ex)
                 {
@@ -813,21 +1024,21 @@ namespace LightroomSync
                     var result = MessageBox.Show("Sorry, I couldn't find the version number. Do you want to go to the website to check?", "Error!", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation);
                     if (result == DialogResult.Yes)
                     {
-                        Utils.OpenURL("https://github.com/software-2/LightroomSync/releases");
+                        Utils.OpenURL(RepoUrl + "/releases");
                     }
                     return;
                 }
             }
 
-            var parsed = Version.Parse(version);
+            var parsed = Version.Parse(version.Trim());
 
-            if (parsed.CompareTo(Version.Parse(currentVersion)) != 0)
+            if (parsed.CompareTo(Version.Parse(currentVersion)) > 0)
             {
                 var dialog = "There is a new version! Want to go get it?" + Environment.NewLine + Environment.NewLine + "New Version: " + parsed.ToString() + Environment.NewLine + "Your Version: " + currentVersion.ToString();
                 var result = MessageBox.Show(dialog, "New Version!", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation);
                 if (result == DialogResult.Yes)
                 {
-                    Utils.OpenURL("https://github.com/software-2/LightroomSync/releases");
+                    Utils.OpenURL(RepoUrl + "/releases");
                 }
             }
             else if (!silently)
@@ -838,12 +1049,12 @@ namespace LightroomSync
 
         private void submitABugToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Utils.OpenURL("https://github.com/software-2/LightroomSync/issues");
+            Utils.OpenURL(RepoUrl + "/issues");
         }
 
         private void gitHubPageToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Utils.OpenURL("https://github.com/software-2/LightroomSync");
+            Utils.OpenURL(RepoUrl);
         }
 
         private void minimizeToTrayToolStripMenuItem_Click(object sender, EventArgs e)

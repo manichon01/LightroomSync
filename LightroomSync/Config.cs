@@ -14,6 +14,10 @@ namespace LightroomSync
 
         public bool AutoCheckForUpdates { get; set; }
 
+        public int CheckIntervalSeconds { get; set; } = 5;
+        public int BackupsToKeep { get; set; } = 3;
+        public bool Notifications { get; set; } = true;
+
         public Config() { 
             this.LocalFolder = "C:\\Users\\" + System.Environment.UserName + "\\Pictures\\Lightroom";
             this.NetworkFolder = "P:\\Lightroom";
