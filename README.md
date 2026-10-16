@@ -1,4 +1,4 @@
-# LightroomSync
+﻿# LightroomSync
 
 A tool to manage your Lightroom Classic catalogs across multiple Windows computers.
 
@@ -17,6 +17,9 @@ This is a maintained fork of [software-2/LightroomSync](https://github.com/softw
 - **Keeps your previous catalog as a backup** whenever it is replaced (you choose how many versions), and a **Catalogs** window can restore the previous version.
 - **Pauses by itself** when the network folder is unreachable and resumes when it is back. No more crashes when the NAS is off.
 - Never replaces your catalog until the new one is downloaded, extracted and checked. Uploads use a temporary name on the share, so other computers never read a half-written zip.
+- **Checks every catalog for corruption** before uploading and before installing a download, and blocks an upload when many photos suddenly lose their develop settings.
+- **Sync & open Lightroom** button: installs the newest catalog first, then opens Lightroom.
+- A log file for bug reports (Help > Open Log Folder).
 - Status indicator, progress bar, tray notifications, dark mode and a **built-in User Guide** (Help > User Guide, or F1).
 - Self-contained installer: no need to install .NET.
 

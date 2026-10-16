@@ -46,6 +46,7 @@
             buttonSyncNow = new Button();
             buttonUploadNow = new Button();
             buttonCatalogs = new Button();
+            buttonOpenLightroom = new Button();
             labelEvents = new Label();
             eventsTextBox = new TextBox();
             timer1 = new System.Windows.Forms.Timer(components);
@@ -58,6 +59,7 @@
             settingsToolStripMenuItem = new ToolStripMenuItem();
             helpToolStripMenuItem = new ToolStripMenuItem();
             userGuideToolStripMenuItem = new ToolStripMenuItem();
+            openLogFolderToolStripMenuItem = new ToolStripMenuItem();
             submitABugToolStripMenuItem = new ToolStripMenuItem();
             gitHubPageToolStripMenuItem = new ToolStripMenuItem();
             checkForUpdatesToolStripMenuItem = new ToolStripMenuItem();
@@ -222,6 +224,7 @@
             actionsPanel.Controls.Add(buttonSyncNow);
             actionsPanel.Controls.Add(buttonUploadNow);
             actionsPanel.Controls.Add(buttonCatalogs);
+            actionsPanel.Controls.Add(buttonOpenLightroom);
             actionsPanel.Dock = DockStyle.Top;
             actionsPanel.Margin = new Padding(0, 0, 0, 12);
             actionsPanel.Name = "actionsPanel";
@@ -261,6 +264,17 @@
             buttonCatalogs.UseVisualStyleBackColor = true;
             buttonCatalogs.Click += buttonCatalogs_Click;
             //
+            // buttonOpenLightroom
+            //
+            buttonOpenLightroom.AutoSize = false;
+            buttonOpenLightroom.Margin = new Padding(8, 0, 0, 0);
+            buttonOpenLightroom.Name = "buttonOpenLightroom";
+            buttonOpenLightroom.Size = new Size(200, 36);
+            buttonOpenLightroom.TabIndex = 8;
+            buttonOpenLightroom.Text = "Sync && open Lightroom";
+            buttonOpenLightroom.UseVisualStyleBackColor = true;
+            buttonOpenLightroom.Click += buttonOpenLightroom_Click;
+            //
             // labelEvents
             //
             labelEvents.AutoSize = true;
@@ -278,7 +292,7 @@
             eventsTextBox.Name = "eventsTextBox";
             eventsTextBox.ReadOnly = true;
             eventsTextBox.ScrollBars = ScrollBars.Vertical;
-            eventsTextBox.TabIndex = 8;
+            eventsTextBox.TabIndex = 9;
             //
             // timer1
             //
@@ -333,7 +347,7 @@
             //
             // helpToolStripMenuItem
             //
-            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { userGuideToolStripMenuItem, submitABugToolStripMenuItem, gitHubPageToolStripMenuItem, checkForUpdatesToolStripMenuItem, aboutToolStripMenuItem });
+            helpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { userGuideToolStripMenuItem, submitABugToolStripMenuItem, gitHubPageToolStripMenuItem, checkForUpdatesToolStripMenuItem, openLogFolderToolStripMenuItem, aboutToolStripMenuItem });
             helpToolStripMenuItem.Name = "helpToolStripMenuItem";
             helpToolStripMenuItem.Text = "Help";
             //
@@ -343,6 +357,12 @@
             userGuideToolStripMenuItem.ShortcutKeys = Keys.F1;
             userGuideToolStripMenuItem.Text = "User Guide";
             userGuideToolStripMenuItem.Click += userGuideToolStripMenuItem_Click;
+            //
+            // openLogFolderToolStripMenuItem
+            //
+            openLogFolderToolStripMenuItem.Name = "openLogFolderToolStripMenuItem";
+            openLogFolderToolStripMenuItem.Text = "Open Log Folder";
+            openLogFolderToolStripMenuItem.Click += openLogFolderToolStripMenuItem_Click;
             //
             // submitABugToolStripMenuItem
             //
@@ -412,6 +432,8 @@
         private Button buttonSyncNow;
         private Button buttonUploadNow;
         private Button buttonCatalogs;
+        private Button buttonOpenLightroom;
+        private ToolStripMenuItem openLogFolderToolStripMenuItem;
         private ProgressBar progressBar;
         private ToolStripMenuItem settingsToolStripMenuItem;
         private ToolStripMenuItem userGuideToolStripMenuItem;

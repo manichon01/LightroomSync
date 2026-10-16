@@ -58,7 +58,19 @@ The colored dot at the top of the window shows what the app is doing.
 - **Sync now:** checks the network folder right away and downloads newer catalogs. It also retries catalogs that failed before.
 - **Upload now:** zips your local catalogs and saves them to the network folder immediately. Close Lightroom first. Use it for the very first upload, or after you restore a version.
 - **Catalogs...:** shows every catalog and lets you restore the previous version (see "Backups and restoring").
+- **Sync & open Lightroom:** checks the network folder, installs any newer catalog, and only then opens your most recently used catalog in Lightroom. Use it instead of opening Lightroom yourself, so you never start on an out-of-date catalog. If the share cannot be reached, it asks before opening.
 - **Browse...:** pick a folder instead of typing its path.
+
+## Safety checks
+
+A Lightroom catalog is a database, and a damaged one can quietly spread to all your computers. So the app checks every catalog:
+
+- **Before uploading:** the catalog is checked for corruption. If it fails, **nothing is uploaded** and the good copy on the network folder stays as it is.
+- **Looks different from last time:** if many photos suddenly have no develop settings (their edits), or the photo count drops sharply, an automatic upload is blocked and you get a notification. **Upload now** shows the problem and asks if you want to upload anyway.
+- **Before installing a download:** the downloaded catalog is checked. If it is damaged, your local catalog is not replaced.
+- The Events log shows the photo count of each catalog, for example `200 photos, 0 without develop settings`.
+
+If an upload is blocked, do not panic: your older versions are safe in the backups and in the zips on the network folder. Open the catalog in Lightroom to see what is wrong, or use **Catalogs...** to restore the previous version.
 
 ## Two computers at once
 
@@ -135,6 +147,7 @@ The app **never deletes** the zips on the network folder. They are your safety c
 - **Settings:** `%APPDATA%\LightroomSync\config.txt`
 - **Working files:** `%APPDATA%\LightroomSync` (zips are kept here only during a transfer)
 - **Backups:** `LightroomSync Backup` inside your local catalog folder
+- **Log files:** `%APPDATA%\LightroomSync\logs` (open it with **Help > Open Log Folder**). The app keeps everything the Events box shows, plus any crash details, and about 3 MB of history.
 
 Paste `%APPDATA%\LightroomSync` into the Windows Explorer address bar to open the settings folder.
 
@@ -198,4 +211,4 @@ Start the app hidden in the system tray:
 
 ## Getting help
 
-Use **Help > Submit A Bug** and include the text from the **Events** log. It shows what the app was doing and usually points to the cause.
+Use **Help > Submit A Bug** and attach the file `lightroomsync.log` from **Help > Open Log Folder**. It shows what the app was doing, including crashes, and usually points to the cause.

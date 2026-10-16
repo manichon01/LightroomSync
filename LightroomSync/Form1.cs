@@ -68,6 +68,7 @@ namespace LightroomSync
 
         private void Log(string message)
         {
+            AppLog.Write(message);
             if (eventsTextBox.InvokeRequired)
             {
                 eventsTextBox.Invoke(new Action<string>(Log), message);
@@ -358,7 +359,8 @@ namespace LightroomSync
             return null;
         }
 
-        private async Task UploadCatalogs()
+        // confirmSuspicious: asked when a catalog looks damaged compared with its last upload. null (automatic uploads) means "do not upload".
+        private async Task UploadCatalogs(Func<string, bool>? confirmSuspicious = null)
         {
             SetStatus("Uploading catalogs...", StatusBlue);
             if (!await IsNetworkFolderAvailable())
@@ -392,6 +394,35 @@ namespace LightroomSync
             {
                 Log("Network status file says it's not safe to proceed! Something has gone wrong, or another catalog sync is happening!");
                 return;
+            }
+
+            // Health-check every catalog before touching the share, so a damaged catalog can never replace a good copy.
+            var health = new Dictionary<string, CatalogHealth>();
+            foreach (string localCatalog in Directory.GetFiles(config.LocalFolder, "*.lrcat"))
+            {
+                string name = Path.GetFileNameWithoutExtension(localCatalog);
+                SetProgress(null, "Checking " + name);
+                CatalogHealth result = await Task.Run(() => CatalogCheck.Inspect(localCatalog));
+                if (!result.Ok)
+                {
+                    Log("ERROR: " + name + " failed the integrity check (" + result.Detail + "). Nothing was uploaded.");
+                    Notify("Upload blocked", name + " failed the integrity check. Nothing was uploaded.", ToolTipIcon.Error);
+                    return;
+                }
+                health[name] = result;
+                Log(name + ": " + result.Summary());
+
+                string? concern = CatalogCheck.Concern(result, loadedStatus?.Catalogs.GetValueOrDefault(name));
+                if (concern != null && (confirmSuspicious == null || !confirmSuspicious(name + ": " + concern)))
+                {
+                    Log("Upload blocked for " + name + ": " + concern);
+                    Notify("Upload blocked", name + ": " + concern + " Check the catalog, then use Upload now.", ToolTipIcon.Warning);
+                    return;
+                }
+            }
+            if (loadedStatus != null)
+            {
+                status.Catalogs = loadedStatus.Catalogs;
             }
 
             status.isSafeToOverride = false;
@@ -445,6 +476,10 @@ namespace LightroomSync
                     await CopyFileAsync(customFormat, partPath, "Uploading " + catName);
                     await Task.Run(() => { File.Move(partPath, finalPath, true); File.Delete(customFormat); });
                     status.MostRecentVersions.Add(customFormat);
+                    if (health.TryGetValue(catName, out CatalogHealth? uploaded))
+                    {
+                        status.Catalogs[catName] = new CatalogInfo { Images = uploaded.Images, MissingDevelop = uploaded.MissingDevelop };
+                    }
                     Log(customFormat + " uploaded successfully.");
                 }
                 catch (Exception ex)
@@ -565,7 +600,75 @@ namespace LightroomSync
 
         private async void buttonUploadNow_Click(object sender, EventArgs e)
         {
-            await RunExclusive(UploadCatalogs);
+            await RunExclusive(() => UploadCatalogs(AskUploadAnyway));
+        }
+
+        private bool AskUploadAnyway(string concern)
+        {
+            return MessageBox.Show(concern + "\n\nUploading will replace the good copy on the network folder (older zips stay there).\n\nUpload anyway?",
+                "Catalog looks damaged", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        }
+
+        // Syncs first, so Lightroom never opens an out-of-date catalog, then opens the most recently used catalog.
+        private async void buttonOpenLightroom_Click(object sender, EventArgs e)
+        {
+            if (Status.LightroomIsOpen())
+            {
+                Log("Lightroom is already open.");
+                return;
+            }
+            if (timerBeingHandled)
+            {
+                Log("A sync is in progress. Try again in a moment.");
+                return;
+            }
+
+            string? catalog = Directory.Exists(config.LocalFolder)
+                ? Directory.GetFiles(config.LocalFolder, "*.lrcat").OrderByDescending(File.GetLastWriteTime).FirstOrDefault()
+                : null;
+            if (catalog == null)
+            {
+                MessageBox.Show("There is no catalog in the local catalog folder.", "Open Lightroom", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!await IsNetworkFolderAvailable())
+            {
+                var answer = MessageBox.Show("The network folder is unreachable, so this computer cannot check for a newer catalog.\n\nOpen Lightroom anyway?",
+                    "Open Lightroom", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+                if (answer != DialogResult.Yes)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                failedCatalogs.Clear();
+                await RunExclusive(HandleTimerEventCore);
+                if (failedCatalogs.Count > 0)
+                {
+                    MessageBox.Show("A newer catalog could not be installed, so Lightroom was not opened. See the Events log.",
+                        "Open Lightroom", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(catalog) { UseShellExecute = true });
+                Log("Opening " + Path.GetFileName(catalog) + " in Lightroom.");
+            }
+            catch (Exception ex)
+            {
+                Log("ERROR opening Lightroom: " + ex.Message);
+                MessageBox.Show("Could not open the catalog: " + ex.Message, "Open Lightroom", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void openLogFolderToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Directory.CreateDirectory(AppLog.Folder);
+            Utils.OpenURL(AppLog.Folder);
         }
 
         private void buttonCatalogs_Click(object sender, EventArgs e)
@@ -664,7 +767,7 @@ namespace LightroomSync
                 // Make the restored catalog the newest version so the next sync uploads it instead of overwriting it.
                 File.SetLastWriteTime(Path.Combine(config.LocalFolder, catName + ".lrcat"), DateTime.Now);
                 Log("Restored the previous version of " + catName + ". The version it replaced is kept in " + swapDir);
-                await UploadCatalogs();
+                await UploadCatalogs(AskUploadAnyway);
             });
             return error;
         }
@@ -702,6 +805,7 @@ namespace LightroomSync
             networkFolderTextBox.Text = config.NetworkFolder;
 
             status.LastUser = System.Environment.MachineName;
+            AppLog.Write("LightroomSync " + currentVersion + " started on " + Environment.MachineName);
             timer1.Interval = Math.Max(1, config.CheckIntervalSeconds) * 1000;
 
             if (Utils.ShortcutExistsInStartupFolder())
@@ -879,6 +983,12 @@ namespace LightroomSync
                 }
 
                 Log("Detected Lightroom is open. Updating the status file to alert other machines.");
+                if (loadedStatus != null)
+                {
+                    // Keep what the share already knows (current versions, photo counts) instead of blanking it.
+                    status.MostRecentVersions = loadedStatus.MostRecentVersions;
+                    status.Catalogs = loadedStatus.Catalogs;
+                }
                 hasDealtWithLightroomOpen = true;
                 status.isSafeToOverride = false;
                 status.LastUser = Environment.MachineName;
@@ -977,6 +1087,14 @@ namespace LightroomSync
                 {
                     throw new InvalidDataException("Zip does not contain a valid " + catName + ".lrcat");
                 }
+
+                SetProgress(null, "Checking " + catName);
+                CatalogHealth downloaded = await Task.Run(() => CatalogCheck.Inspect(extractedCat));
+                if (!downloaded.Ok)
+                {
+                    throw new InvalidDataException("The downloaded catalog failed the integrity check (" + downloaded.Detail + ")");
+                }
+                Log(catName + " (downloaded): " + downloaded.Summary());
 
                 // Point of no return: park the old catalog in the backup folder, then move the new one in.
                 Directory.CreateDirectory(backupDir);

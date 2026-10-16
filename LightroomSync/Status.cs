@@ -9,11 +9,19 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace LightroomSync
 {
+    internal class CatalogInfo
+    {
+        public long Images { get; set; }
+        public long MissingDevelop { get; set; }
+    }
+
     internal class Status
     {
         public string LastUser { get; set; }
         public bool isSafeToOverride { get; set; }
         public List<string> MostRecentVersions { get; set; }
+        // Photo counts of each catalog at its last upload, used to spot damage before the next upload.
+        public Dictionary<string, CatalogInfo> Catalogs { get; set; } = new();
 
         public Status() {
             LastUser = Environment.MachineName;
